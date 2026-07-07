@@ -1,17 +1,21 @@
-# easyedit
+# Nestpave
 
-A new Flutter project.
+Professional AI-powered photo and video editing platform built with Flutter.
 
-## Getting Started
+## About
 
-This project is a starting point for a Flutter application.
+Nestpave is an advanced editor that combines the power of Lightroom, Picsart, Photoshop, and CapCut into one intelligent application.
 
-A few resources to get you started if this is your first Flutter project:
+### Vision
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+- AI object separation from screenshots
+- Professional color grading
+- DNG preset generation
+- Copy & paste color grading
+- PSD-like editable projects
+- Skin retouching and frequency separation
+- Background removal
+- Smart masking
+- Future video editing support
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+Built with ❤️ by Karmenous.
