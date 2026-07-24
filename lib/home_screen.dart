@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:screenshot/screenshot.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
@@ -24,8 +25,51 @@ class _HomeScreenState extends State<HomeScreen> {
   String _selectedTool = 'adjust';
   bool _isSaving = false;
 
+  List<Map<String, dynamic>> _textLayers = [];
+  int? _selectedTextIndex;
+  Color _selectedTextColor = Colors.white;
+  double _selectedTextSize = 24;
+  String _selectedFont = 'Roboto';
+
   final ImagePicker _picker = ImagePicker();
   final ScreenshotController _screenshotController = ScreenshotController();
+  final TextEditingController _textController = TextEditingController();
+
+  // Available fonts
+  final List<Map<String, String>> _fonts = [
+    {'name': 'Roboto', 'label': 'Roboto'},
+    {'name': 'Playfair Display', 'label': 'Playfair'},
+    {'name': 'Montserrat', 'label': 'Montserrat'},
+    {'name': 'Oswald', 'label': 'Oswald'},
+    {'name': 'Pacifico', 'label': 'Pacifico'},
+    {'name': 'Dancing Script', 'label': 'Dancing'},
+    {'name': 'Anton', 'label': 'Anton'},
+    {'name': 'Bebas Neue', 'label': 'Bebas'},
+  ];
+
+  TextStyle _getGoogleFont(String fontName, double size, Color color) {
+    try {
+      return GoogleFonts.getFont(
+        fontName,
+        fontSize: size,
+        color: color,
+        fontWeight: FontWeight.bold,
+        shadows: const [
+          Shadow(
+            blurRadius: 4,
+            color: Colors.black54,
+            offset: Offset(1, 1),
+          ),
+        ],
+      );
+    } catch (e) {
+      return TextStyle(
+        fontSize: size,
+        color: color,
+        fontWeight: FontWeight.bold,
+      );
+    }
+  }
 
   Future<void> _pickImage() async {
     final XFile? file = await _picker.pickImage(source: ImageSource.gallery);
@@ -57,6 +101,22 @@ class _HomeScreenState extends State<HomeScreen> {
     } finally {
       setState(() => _isSaving = false);
     }
+  }
+
+  void _addTextLayer() {
+    if (_textController.text.isEmpty) return;
+    setState(() {
+      _textLayers.add({
+        'content': _textController.text,
+        'x': 100.0,
+        'y': 100.0,
+        'color': _selectedTextColor.value,
+        'size': _selectedTextSize,
+        'font': _selectedFont,
+      });
+      _selectedTextIndex = _textLayers.length - 1;
+    });
+    _textController.clear();
   }
 
   void _applyFilterPreset(String preset) {
@@ -282,22 +342,75 @@ class _HomeScreenState extends State<HomeScreen> {
                         Center(
                           child: Screenshot(
                             controller: _screenshotController,
-                            child: ImageFiltered(
-                              imageFilter: _sharpness > 0
-                                  ? ui.ImageFilter.matrix(
-                                      _buildSharpnessMatrix(_sharpness),
-                                      filterQuality: FilterQuality.high,
-                                    )
-                                  : ui.ImageFilter.blur(
-                                      sigmaX: 0, sigmaY: 0),
-                              child: ColorFiltered(
-                                colorFilter: ColorFilter.matrix(
-                                    _buildColorMatrix()),
-                                child: Image.memory(
-                                  _imageBytes!,
-                                  fit: BoxFit.contain,
+                            child: Stack(
+                              children: [
+                                ImageFiltered(
+                                  imageFilter: _sharpness > 0
+                                      ? ui.ImageFilter.matrix(
+                                          _buildSharpnessMatrix(_sharpness),
+                                          filterQuality: FilterQuality.high,
+                                        )
+                                      : ui.ImageFilter.blur(
+                                          sigmaX: 0, sigmaY: 0),
+                                  child: ColorFiltered(
+                                    colorFilter: ColorFilter.matrix(
+                                        _buildColorMatrix()),
+                                    child: Image.memory(
+                                      _imageBytes!,
+                                      fit: BoxFit.contain,
+                                    ),
+                                  ),
                                 ),
-                              ),
+                                // Text layers
+                                ..._textLayers.asMap().entries.map((entry) {
+                                  int index = entry.key;
+                                  Map<String, dynamic> layer = entry.value;
+                                  return Positioned(
+                                    left: layer['x'],
+                                    top: layer['y'],
+                                    child: GestureDetector(
+                                      onTap: () {
+                                        setState(() {
+                                          _selectedTextIndex = index;
+                                          _selectedTextColor =
+                                              Color(layer['color']);
+                                          _selectedTextSize = layer['size'];
+                                          _selectedFont = layer['font'] ??
+                                              'Roboto';
+                                        });
+                                      },
+                                      onPanUpdate: (details) {
+                                        setState(() {
+                                          _textLayers[index]['x'] +=
+                                              details.delta.dx;
+                                          _textLayers[index]['y'] +=
+                                              details.delta.dy;
+                                        });
+                                      },
+                                      child: Container(
+                                        padding: const EdgeInsets.all(4),
+                                        decoration: BoxDecoration(
+                                          border: _selectedTextIndex == index
+                                              ? Border.all(
+                                                  color:
+                                                      const Color(0xFF6C63FF),
+                                                  width: 1,
+                                                )
+                                              : null,
+                                        ),
+                                        child: Text(
+                                          layer['content'],
+                                          style: _getGoogleFont(
+                                            layer['font'] ?? 'Roboto',
+                                            layer['size'],
+                                            Color(layer['color']),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                }),
+                              ],
                             ),
                           ),
                         ),
@@ -427,6 +540,225 @@ class _HomeScreenState extends State<HomeScreen> {
             _filterChip('Cool', 'cool'),
             _filterChip('Vivid', 'vivid'),
             _filterChip('Soft', 'soft'),
+          ],
+        ),
+      );
+    }
+
+    if (_selectedTool == 'text') {
+      return Container(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Live text input row
+            Row(
+              children: [
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1A1A2E),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFF2A2A40)),
+                    ),
+                    child: TextField(
+                      controller: _textController,
+                      style: const TextStyle(
+                          color: Colors.white, fontSize: 14),
+                      decoration: const InputDecoration(
+                        hintText: 'Type your text...',
+                        hintStyle: TextStyle(color: Colors.white38),
+                        border: InputBorder.none,
+                      ),
+                      onChanged: (value) {
+                        // live preview — update selected text as user types
+                        if (_selectedTextIndex != null) {
+                          setState(() {
+                            _textLayers[_selectedTextIndex!]['content'] =
+                                value;
+                          });
+                        }
+                      },
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                GestureDetector(
+                  onTap: _addTextLayer,
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF6C63FF),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.add,
+                        color: Colors.white, size: 20),
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 10),
+
+            // Font picker
+            SizedBox(
+              height: 40,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                itemCount: _fonts.length,
+                itemBuilder: (context, index) {
+                  String fontName = _fonts[index]['name']!;
+                  String fontLabel = _fonts[index]['label']!;
+                  bool isSelected = _selectedFont == fontName;
+                  return GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _selectedFont = fontName;
+                        if (_selectedTextIndex != null) {
+                          _textLayers[_selectedTextIndex!]['font'] =
+                              fontName;
+                        }
+                      });
+                    },
+                    child: Container(
+                      margin: const EdgeInsets.only(right: 8),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? const Color(0xFF6C63FF)
+                            : const Color(0xFF1A1A2E),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: isSelected
+                              ? const Color(0xFF6C63FF)
+                              : const Color(0xFF2A2A40),
+                        ),
+                      ),
+                      child: Text(
+                        fontLabel,
+                        style: GoogleFonts.getFont(
+                          fontName,
+                          color: isSelected
+                              ? Colors.white
+                              : Colors.white54,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+
+            const SizedBox(height: 8),
+
+            // Color and size row
+            Row(
+              children: [
+                // Colors
+                ...[
+                  Colors.white,
+                  Colors.black,
+                  Colors.yellow,
+                  const Color(0xFF6C63FF),
+                  Colors.red,
+                  Colors.green,
+                  Colors.blue,
+                  Colors.orange,
+                ].map((color) {
+                  return GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _selectedTextColor = color;
+                        if (_selectedTextIndex != null) {
+                          _textLayers[_selectedTextIndex!]['color'] =
+                              color.value;
+                        }
+                      });
+                    },
+                    child: Container(
+                      width: 22,
+                      height: 22,
+                      margin: const EdgeInsets.only(right: 6),
+                      decoration: BoxDecoration(
+                        color: color,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: _selectedTextColor == color
+                              ? const Color(0xFF6C63FF)
+                              : Colors.white24,
+                          width: _selectedTextColor == color ? 2 : 1,
+                        ),
+                      ),
+                    ),
+                  );
+                }),
+
+                const SizedBox(width: 8),
+
+                // Size slider
+                Expanded(
+                  child: Slider(
+                    value: _selectedTextSize,
+                    min: 12,
+                    max: 72,
+                    activeColor: const Color(0xFF6C63FF),
+                    inactiveColor: const Color(0xFF1A1A2E),
+                    onChanged: (v) {
+                      setState(() {
+                        _selectedTextSize = v;
+                        if (_selectedTextIndex != null) {
+                          _textLayers[_selectedTextIndex!]['size'] = v;
+                        }
+                      });
+                    },
+                  ),
+                ),
+
+                Text(
+                  _selectedTextSize.toInt().toString(),
+                  style: const TextStyle(
+                      color: Colors.white54, fontSize: 12),
+                ),
+              ],
+            ),
+
+            // Delete button
+            if (_selectedTextIndex != null)
+              GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _textLayers.removeAt(_selectedTextIndex!);
+                    _selectedTextIndex = null;
+                  });
+                },
+                child: Container(
+                  margin: const EdgeInsets.only(top: 6),
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: Colors.red.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(8),
+                    border:
+                        Border.all(color: Colors.red.withOpacity(0.4)),
+                  ),
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.delete, color: Colors.red, size: 16),
+                      SizedBox(width: 6),
+                      Text(
+                        'Delete text',
+                        style:
+                            TextStyle(color: Colors.red, fontSize: 13),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
           ],
         ),
       );
